@@ -26,7 +26,7 @@ light_sensor = Light(brick, PORT_2, illuminated=True)
 current_gear = 1
 shift_power = 30 # TODO: no clue what this is or what it does
 shift_backlash = 20 # TODO: no clue what this is or what it does
-shift_degrees = [120, 105, 110, 100] # TODO: no clue what this is or what it does
+shift_degrees = [120] # our final demo only had two gears, add elements to the list for a project using more gears
 finished = False
 shift_direction = ""
 
@@ -56,18 +56,18 @@ t_start = time.perf_counter()
 while not finished:
     # Record light sensor reading
     gear_changed = False
-    time_elapsed = time.perf_counter() - t_start
-    times.append(time_elapsed)
+    t_elapsed = time.perf_counter() - t_start
+    times.append(t_elapsed)
     light_record.append(light_sensor.get_lightness())
 
     # Touch sensor
     if touch_sensor.is_pressed():
 
-        # End program if touch sensor is held down for >10 seconds
+        # End program if touch sensor is held down for 3 seconds
         t_press_start = time.perf_counter()
+        t_press_threshold = time.perf_counter() + 3
         while touch_sensor.is_pressed():
-            t_press_elapsed = time.perf_counter() - t_press_start
-            if t_press_elapsed >= 10: # TODO: configure end button hold duration
+            if time.perf_counter() > t_press_threshold:
                 finished = True
                 break
         if finished:
@@ -112,9 +112,3 @@ def change_gear(current_gear, last_shift):
     motor_shift.wait_for()
     brick.play_tone(1200, 200) # TODO: change to our desired notice tones
     gear_changed = True
-    
-    
-
-
-if __name__ == "__main__":
-    pass
