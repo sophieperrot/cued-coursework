@@ -89,7 +89,7 @@ while not finished:
 
         # End program if touch sensor is held down for PRESS_THRESHOLD seconds
         t_press_start = time.perf_counter()
-        t_press_threshold = time.perf_counter() + PRESS_THRESHOLD
+        t_press_threshold = t_press_start + PRESS_THRESHOLD
         while touch_sensor.is_pressed():
             if time.perf_counter() > t_press_threshold:
                 finished = True
