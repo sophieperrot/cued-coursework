@@ -81,13 +81,21 @@ def test_long_press():
                         finished = True
                         break
                 if finished:
+                    print("SUCCESS")
                     break
                 # Manually gear change (when button is pressed but not held down)
                 change_gear(current_gear, last_shift)
                 gear_changed = True
     except KeyboardInterrupt:
+        print("FAIL: manual exit")
+    except Exception as e:
         print("FAIL")
-    print("SUCCESS")
+        print(e)
+    
+
+
+# demo_motor_power(motor_drive, 100)
+test_long_press()
 
 
 # Turn off components
@@ -95,4 +103,3 @@ motor_drive.idle()
 motor_shift.idle()
 
 light_sensor.set_illuminated(False)
-
