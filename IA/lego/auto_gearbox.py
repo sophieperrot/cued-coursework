@@ -5,6 +5,14 @@ import matplotlib.pyplot as plt
 from cued_ia_lego import *
 
 
+# Constants
+NUM_GEARS = 2
+PRESS_THRESHOLD = 3 # seconds
+SHIFT_DEGREES = [] # degrees, list of NUM_GEARS-1 elements
+SHIFT_POWER = 30
+SHIFT_BACKLASH = 20
+
+
 # Connect to brick
 try:
     brick = NXTBrick()
@@ -24,11 +32,8 @@ light_sensor = Light(brick, PORT_2, illuminated=True)
 
 # Initialise variables
 current_gear = 1
-shift_power = 30 # TODO: no clue what this is or what it does
-shift_backlash = 20 # TODO: no clue what this is or what it does
-shift_degrees = [120] # our final demo only had two gears, add elements to the list for a project using more gears
 finished = False
-shift_direction = ""
+last_shift = ""
 
 
 # Initialise plots
@@ -51,6 +56,25 @@ motor_drive.reset_position()
 motor_drive.run()
 
 
+# Gear change function
+def change_gear(current_gear, last_shift):
+    turn_degrees = SHIFT_DEGREES[current_gear + 1] if last_shift == "up" else SHIFT_DEGREES[current_gear - 1]
+
+    if current_gear == 0 and last_shift == "down":
+        last_shift = "up"
+        turn_degrees += SHIFT_BACKLASH
+    elif current_gear == NUM_GEARS-1 and last_shift == "up":
+        last_shift = "down"
+        turn_degrees -= SHIFT_BACKLASH
+
+    current_gear = current_gear + 1 if last_shift == "up" else current_gear - 1
+    power = SHIFT_POWER if last_shift == "up" else -SHIFT_POWER
+
+    motor_shift.turn(turn_degrees, power)
+    motor_shift.wait_for()
+    brick.play_tone(1200, 200)
+
+
 # Main loop
 t_start = time.perf_counter()
 while not finished:
@@ -63,9 +87,9 @@ while not finished:
     # Touch sensor
     if touch_sensor.is_pressed():
 
-        # End program if touch sensor is held down for 3 seconds
+        # End program if touch sensor is held down for PRESS_THRESHOLD seconds
         t_press_start = time.perf_counter()
-        t_press_threshold = time.perf_counter() + 3
+        t_press_threshold = time.perf_counter() + PRESS_THRESHOLD
         while touch_sensor.is_pressed():
             if time.perf_counter() > t_press_threshold:
                 finished = True
@@ -73,8 +97,16 @@ while not finished:
         if finished:
             break
 
-        # Manually change gear ()
-        
+        # Manually gear change (when button is pressed but not held down)
+        change_gear(current_gear, last_shift)
+        gear_changed = True
+
+    
+    # Automatic gear change
+    if TODO:
+        change_gear(current_gear, last_shift)
+        gear_changed = True
+
 
     if gear_changed:
         print(f"Gear change to: {current_gear}")
@@ -93,22 +125,3 @@ if speed_record:
     plt.ylim(0, 1.1 * max(speed_record))
 
     plt.show()
-
-
-def change_gear(current_gear, last_shift):
-    turn_degrees = shift_degrees[current_gear - 1]
-
-    if current_gear == 0 and last_shift == "down":
-        last_shift = "up"
-        turn_degrees += shift_backlash
-    elif current_gear == 2 and last_shift == "up":
-        last_shift = "down"
-        turn_degrees += shift_backlash
-
-    current_gear = current_gear + 1 if last_shift == "up" else current_gear - 1
-    
-
-    motor_shift.turn(turn_degrees, shift_power)
-    motor_shift.wait_for()
-    brick.play_tone(1200, 200) # TODO: change to our desired notice tones
-    gear_changed = True
