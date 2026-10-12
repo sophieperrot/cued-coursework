@@ -24,15 +24,15 @@ light_sensor = Light(brick, PORT_2, illuminated=True)
 
 # Constants
 NUM_GEARS = 2
-PRESS_THRESHOLD = 3 # seconds
-SHIFT_DEGREES = [] # degrees, list of NUM_GEARS-1 elements
+PRESS_THRESHOLD = 2 # seconds
+SHIFT_DEGREES = [120] # degrees, list of NUM_GEARS-1 elements
 SHIFT_POWER = 30
 SHIFT_BACKLASH = 20
 
 # Initialise variables
-current_gear = 1
+current_gear = 0
 finished = False
-last_shift = ""
+last_shift = "up"
 
 
 # Start the drive motor
@@ -42,7 +42,7 @@ motor_drive.run()
 
 # Gear change function
 def change_gear(current_gear, last_shift):
-    turn_degrees = SHIFT_DEGREES[current_gear + 1] if last_shift == "up" else SHIFT_DEGREES[current_gear - 1]
+    turn_degrees = SHIFT_DEGREES[current_gear] if last_shift == "up" else SHIFT_DEGREES[current_gear - 1]
 
     if current_gear == 0 and last_shift == "down":
         last_shift = "up"
@@ -68,8 +68,9 @@ def demo_motor_power(motor, power):
         print(e)
 
 
-def test_long_press():
-    print("=== Long button hold test ===")
+def test_button_press():
+    print("=== Button press test ===")
+    finished = False
     try:
         while True:
             if touch_sensor.is_pressed():
@@ -81,11 +82,12 @@ def test_long_press():
                         finished = True
                         break
                 if finished:
-                    print("SUCCESS")
+                    print("SUCCESS: long press detected")
                     break
                 # Manually gear change (when button is pressed but not held down)
                 change_gear(current_gear, last_shift)
-                gear_changed = True
+                print("SUCCESS: gear changed")
+                
     except KeyboardInterrupt:
         print("FAIL: manual exit")
     except Exception as e:
