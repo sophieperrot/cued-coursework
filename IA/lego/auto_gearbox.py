@@ -2,6 +2,9 @@
 
 import time
 import matplotlib.pyplot as plt
+import numpy as np
+import pyfftw
+import statistics
 from cued_ia_lego import *
 
 
@@ -12,7 +15,8 @@ SHIFT_DEGREES = [1000]       # degrees, list of NUM_GEARS-1 elements
 SHIFT_POWER = 100
 SHIFT_BACKLASH = 0
 DRIVE_POWER = 100
-TURN_TOLERANCE = 0
+TURN_TOLERANCE = 50
+WINDOW_LEN = 10
 
 
 # Connect to brick
@@ -36,7 +40,7 @@ light_sensor = Light(brick, PORT_2, illuminated=True)
 current_gear = 0
 finished = False
 last_shift = "up"
-pos_window = [0]*10
+light_window = [0]*WINDOW_LEN
 
 
 # Initialise plots
@@ -80,63 +84,134 @@ def change_gear(gear, shift):
     motor_drive.idle()
     motor_shift.turn(turn_degrees, SHIFT_POWER)
     # motor_shift.wait_for()
-    time.sleep(0.75)
+    time.sleep(1)
     motor_drive.run()
-    brick.play_tone(1200, 200)
+    # brick.play_tone(1200, 200)
+
+    time.sleep(2)
 
     return next_gear, next_shift
 
 
+# Turn off components function
+def turn_off_components():
+    global motor_drive, motor_shift
+    motor_drive.idle()
+    motor_shift.idle()
+
+    light_sensor.set_illuminated(False)
+
+    plt.close(1)
+    plt.close(2)
+    plt.close(3)
+
 
 # Main loop
-t_start = time.perf_counter()
+t_interval_start = time.perf_counter()
+run_time = 0
 while not finished:
-    # Record light sensor reading
-    gear_changed = False
-    t_elapsed = time.perf_counter() - t_start
-    times.append(t_elapsed)
-    light_record.append(light_sensor.get_lightness())
+    try:
+        # Record light sensor reading
+        gear_changed = False
+        interval_time = time.perf_counter() - t_interval_start
+        times.append(run_time + interval_time)
+        light_record.append(light_sensor.get_lightness())
 
-    # Touch sensor
-    if touch_sensor.is_pressed():
 
-        # End program if touch sensor is held down for PRESS_THRESHOLD seconds
-        t_press_start = time.perf_counter()
-        t_press_threshold = t_press_start + PRESS_THRESHOLD
-        while touch_sensor.is_pressed():
-            if time.perf_counter() > t_press_threshold:
-                finished = True
+        # Measure drive motor speed every second
+        if interval_time >= 1:
+            pos = motor_drive.get_position()
+            current_speed = abs(pos / interval_time) * 60/360
+            speed_record.append(current_speed)
+            if len(speed_record) > 1:
+                plt.figure(1)
+                plt.plot([run_time, run_time + interval_time], speed_record[-2:], 'r')
+                plt.xlim(0, 300)
+                plt.ylim(0, 300)
+                plt.pause(0.1)
+            run_time += interval_time
+            # motor_drive.reset_position()
+            t_interval_time = time.perf_counter()
+
+
+        # Touch sensor
+        if touch_sensor.is_pressed():
+
+            # End program if touch sensor is held down for PRESS_THRESHOLD seconds
+            t_press_start = time.perf_counter()
+            t_press_threshold = t_press_start + PRESS_THRESHOLD
+            while touch_sensor.is_pressed():
+                if time.perf_counter() > t_press_threshold:
+                    finished = True
+                    break
+            if finished:
+                print("Terminating program")
                 break
-        if finished:
-            print("Terminating program")
-            break
 
-        # Manually gear change (when button is pressed but not held down)
-        current_gear, last_shift = change_gear(current_gear, last_shift)
-        gear_changed = True
-
-    
-    # Automatic gear change
-    current_pos = motor_drive.get_position()
-    pos_window.pop(0)
-    pos_window.append(current_pos)
-    print(f"current_pos: {current_pos}, pos_window: {pos_window}")
-    if current_pos - TURN_TOLERANCE <= sum(pos_window) / len(pos_window) <= current_pos + TURN_TOLERANCE:
-        # current_gear, last_shift = change_gear(current_gear, last_shift)
-        # gear_changed = True
-        print("CHANGE")
+            # Manually gear change (when button is pressed but not held down)
+            current_gear, last_shift = change_gear(current_gear, last_shift)
+            gear_changed = True
 
 
-    if gear_changed:
-        print(f"Gear change to: {current_gear}")
+        # Automatic gear change
+        # current_pos = motor_drive.get_position()
+        # pos_window.pop(0)
+        # pos_window.append(current_pos)
+        # print(f"current_pos: {current_pos}, pos_window: {pos_window}")
+        # print(f"avg: {sum(pos_window) / len(pos_window)}")
+        current_light = light_sensor.get_lightness()
+        light_window.pop(0)
+        light_window.append(current_light)
+        print(f"current_light: {current_light}, light_window: {light_window}")
+        print(f"avg: {sum(light_window) / len(light_window)}")
+        if len(times) > WINDOW_LEN and not (current_light - TURN_TOLERANCE <= sum(light_window) / len(light_window) <= current_light + TURN_TOLERANCE):
+            current_gear, last_shift = change_gear(current_gear, last_shift)
+            gear_changed = True
+            # print("CHANGE\n")
+
+
+        if gear_changed:
+            print(f"Gear change to: {current_gear}")
+
+        if gear_changed and len(times) > 100:
+            samples = [l - statistics.mean(light_record) for l in light_record]
+            sampling_frequency = 1 / statistics.median(diff(times))
+            Y = pyfftw.interfaces.numpy_fft.rfft(samples)
+            power = abs(Y) ** 2
+            freq = (sampling_frequency / 2) * np.linspace(0, 1, len(Y))
+
+            plt.figure(2)
+            plt.clf()
+            plt.plot(times, samples)
+            plt.grid()
+            plt.xlabel("times (s)")
+            plt.ylabel("light sensor reading")
+            plt.pause(0.1)
+
+            plt.figure(3)
+            plt.clf()
+            plt.plot(freq, power)
+            plt.grid()
+            plt.xlabel("frequency (Hz)")
+            plt.ylabel("power")
+            plt.title("Power spectrum of light sensor reading")
+            plt.pause(0.1)
+
+            light_record = []
+            times = []
+        
+    except KeyboardInterrupt:
+        turn_off_components()
+        break
+
+    except Exception as e:
+        print(f"ERROR: {e}")
+        turn_off_components()
+        break
 
 
 # Turn off components
-motor_drive.idle()
-motor_shift.idle()
-
-light_sensor.set_illuminated(False)
-
+turn_off_components()
 
 if speed_record:
     plt.figure(1)
