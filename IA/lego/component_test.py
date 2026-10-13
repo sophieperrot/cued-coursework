@@ -20,6 +20,7 @@ motor_shift = Motor(brick, PORT_B, power=0, smoothstart=False, speedreg=True,
 
 touch_sensor = Touch(brick, PORT_1)
 light_sensor = Light(brick, PORT_2, illuminated=True)
+sound_sensor = Sound(brick, PORT_3, adjusted=True)
 
 
 # Constants
@@ -66,7 +67,7 @@ def change_gear(gear, shift):
     # motor_shift.wait_for()
     time.sleep(0.75)
     motor_drive.run()
-    brick.play_tone(1200, 200)
+    # brick.play_tone(1200, 200)
 
     return next_gear, next_shift
 
@@ -90,6 +91,41 @@ def demo_motor_turn(motor, degrees, power=50, called=True):
         print(f"turned: {degrees}")
     except Exception as e:
         print(f"ERROT: {e}\n")
+
+
+def demo_sound_sensor():
+    """code copied from cued_ia_lego documentation examples"""
+    times = []
+    sound_readings = []
+
+    # Display a message
+    print('Starting recording')
+
+    # Start time
+    t_start = time.perf_counter()
+    # Stop time
+    t_stop = t_start + 5
+    while time.perf_counter() < t_stop:
+        # Append lists with current reading and time
+        sound_readings.append(sound_sensor.get_loudness())
+        times.append(time.perf_counter() - t_start)
+
+    # Display a message
+    print('Stopping recording')
+
+    # Plot the results
+    plt.plot(times, sound_readings)
+    plt.grid(True)
+    plt.xlabel('time (s)')
+    plt.ylabel('sound sensor reading')
+
+    # Display some information about the results
+    num_readings = len(sound_readings)
+    print(f'The number of readings was: {num_readings}')
+    print(f'The recording rate (samples per second) was: {num_readings / 5 :.3f}')
+
+    print('Close the plot to finish')
+    plt.show()
 
 
 def calibrate_motor_power(motor):
@@ -159,12 +195,30 @@ def test_button_press():
         print(e)
     
 
+def test_sound_sensor():
+    global current_gear, last_shift
+    print("=== Sound sensor test ===")
+    try:
+        while True:
+            reading = sound_sensor.get_loudness()
+            print(reading)
+            if reading >= 550:
+                current_gear, last_shift = change_gear(current_gear, last_shift)
+                print("SUCCESS: gear changed\n")
+    except KeyboardInterrupt:
+        print("FAIL: manual exit")
+    except Exception as e:
+        print("FAIL")
+        print(e)
+
 # ===== RUN TESTS HERE ===== #
 """Uncomment the functions of the tests you want to run 
 and change the parameters to desired values"""
 
 # demo_motor_power(motor_drive, 100, called=False)
-test_button_press()
+# test_button_press()
+# test_sound_sensor()
+demo_sound_sensor()
 # calibrate_motor_power(motor_drive)
 # calibrate_shift_angles(motor_shift, power=100)
 # ========================== #

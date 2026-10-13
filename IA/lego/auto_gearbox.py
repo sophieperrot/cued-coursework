@@ -17,6 +17,7 @@ SHIFT_BACKLASH = 0
 DRIVE_POWER = 100
 TURN_TOLERANCE = 50
 WINDOW_LEN = 10
+SOUND_THRESHOLD = 530
 
 
 # Connect to brick
@@ -34,6 +35,7 @@ motor_shift = Motor(brick, PORT_B, power=SHIFT_POWER, smoothstart=False, speedre
 
 touch_sensor = Touch(brick, PORT_1)
 light_sensor = Light(brick, PORT_2, illuminated=True)
+sound_sensor = Sound(brick, PORT_3, adjusted=True)
 
 
 # Initialise variables
@@ -47,9 +49,12 @@ light_window = [0]*WINDOW_LEN
 times = []
 speed_record = []
 light_record = []
+sound_record = []
 plt.figure(2)
 plt.clf()
 plt.figure(3)
+plt.clf()
+plt.figure(4)
 plt.clf()
 plt.figure(1)
 plt.clf()
@@ -104,6 +109,7 @@ def turn_off_components():
     plt.close(1)
     plt.close(2)
     plt.close(3)
+    plt.close(4)
 
 
 # Main loop
@@ -111,12 +117,12 @@ t_interval_start = time.perf_counter()
 run_time = 0
 while not finished:
     try:
-        # Record light sensor reading
+        # Record light & sound sensors reading
         gear_changed = False
         interval_time = time.perf_counter() - t_interval_start
         times.append(run_time + interval_time)
         light_record.append(light_sensor.get_lightness())
-
+        sound_record.append(sound_sensor.get_loudness())
 
         # Measure drive motor speed every second
         if interval_time >= 1:
@@ -133,6 +139,20 @@ while not finished:
             # motor_drive.reset_position()
             t_interval_time = time.perf_counter()
 
+        # Measure sound every second
+        if interval_time >= 1:
+                    pos = motor_drive.get_position()
+                    current_speed = abs(pos / interval_time) * 60/360
+                    speed_record.append(current_speed)
+                    if len(speed_record) > 1:
+                        plt.figure(1)
+                        plt.plot([run_time, run_time + interval_time], speed_record[-2:], 'r')
+                        plt.xlim(0, 300)
+                        plt.ylim(0, 300)
+                        plt.pause(0.1)
+                    run_time += interval_time
+                    # motor_drive.reset_position()
+                    t_interval_time = time.perf_counter()
 
         # Touch sensor
         if touch_sensor.is_pressed():
@@ -159,12 +179,13 @@ while not finished:
         # pos_window.append(current_pos)
         # print(f"current_pos: {current_pos}, pos_window: {pos_window}")
         # print(f"avg: {sum(pos_window) / len(pos_window)}")
-        current_light = light_sensor.get_lightness()
-        light_window.pop(0)
-        light_window.append(current_light)
-        print(f"current_light: {current_light}, light_window: {light_window}")
-        print(f"avg: {sum(light_window) / len(light_window)}")
-        if len(times) > WINDOW_LEN and not (current_light - TURN_TOLERANCE <= sum(light_window) / len(light_window) <= current_light + TURN_TOLERANCE):
+        # current_light = light_sensor.get_lightness()
+        # light_window.pop(0)
+        # light_window.append(current_light)
+        # print(f"current_light: {current_light}, light_window: {light_window}")
+        # print(f"avg: {sum(light_window) / len(light_window)}")
+        # if len(times) > WINDOW_LEN and not (current_light - TURN_TOLERANCE <= sum(light_window) / len(light_window) <= current_light + TURN_TOLERANCE):
+        if sound_record[-1] > SOUND_THRESHOLD:
             current_gear, last_shift = change_gear(current_gear, last_shift)
             gear_changed = True
             # print("CHANGE\n")
@@ -199,6 +220,15 @@ while not finished:
 
             light_record = []
             times = []
+
+        if sound_record:
+            plt.figure(4)
+            plt.plot(times, sound_record)
+            plt.grid(True)
+            plt.xlabel('time (s)')
+            plt.ylabel('sound sensor reading')
+
+            plt.pause(0.1)
         
     except KeyboardInterrupt:
         turn_off_components()
